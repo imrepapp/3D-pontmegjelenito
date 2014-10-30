@@ -291,7 +291,7 @@ function getLiveData() {
             for (var pIndex in p) {
                 addCoord(p[pIndex]);
             }
-            timestamp = p[coords.length][0];
+            timestamp = p[coords.length - 1][0];
             coordIdx = Math.max(coords.length - tailCount, coordIdx);
             play = true;
         }
