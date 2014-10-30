@@ -71,10 +71,12 @@ renderer.setClearColor(0xaaaabb, 1);
 document.body.appendChild(renderer.domElement);
 
 $('canvas').on('click', function () {
-    if (!play && coordIdx == coords.length - 1) {
-        coordIdx = 0;
+    if (loaded == 'file') {
+        if (!play && coordIdx == coords.length - 1) {
+            coordIdx = 0;
+        }
+        play = !play;
     }
-    play = !play;
 })
 
 //controls
@@ -98,8 +100,8 @@ window.addEventListener('resize', function () {
     renderer.setSize(window.innerWidth, window.innerHeight);
 }, false);
 
-
-$.getJSON("/data/" + _GET['load'] + ".json", function (data) {
+var ID = _GET['load'] != undefined ? _GET['load'] : _GET['live'] != undefined ? _GET['live'] : 'none';
+$.getJSON("/data/" + ID + ".json", function (data) {
     init(data);
 });
 render();
