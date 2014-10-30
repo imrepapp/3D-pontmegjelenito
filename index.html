@@ -253,7 +253,7 @@ function render() {
         }
 
         //tail effect
-        for (var i = 0; i < points.length - 1; i++) {
+        for (var i = 0; i < points.length; i++) {
             var p = points[i];
             p.scale.multiplyScalar(0.9);
             p.scale.clampScalar(0.0001, 1);
