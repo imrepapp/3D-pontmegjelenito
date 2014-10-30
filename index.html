@@ -26,9 +26,11 @@
 <script src="//code.jquery.com/jquery-2.1.1.min.js"></script>
 <script src="//code.jquery.com/ui/1.11.1/jquery-ui.min.js"></script>
 <script>
+
+var _HASH = location.hash.substr(1).split(',');
 var _GET = (function () {
     var vars = [], hash;
-    var q = document.URL.split('?')[1];
+    var q = document.URL.split('?')[1].split("#")[0];
     if (q != undefined) {
         q = q.split('&');
         for (var i = 0; i < q.length; i++) {
@@ -40,88 +42,40 @@ var _GET = (function () {
 })();
 
 var pathMaterial = new THREE.LineBasicMaterial({ color: 0xFF0000, opacity: 0.3, transparent: true });
-
 var scene = new THREE.Scene();
 
 var points = [];
+var coords = [];
+var paths  = [];
 
+var reuseIdx  = 0;
+var coordIdx  = 0;
+var timestamp = 0;
+var zoom      = 150;
+
+var loaded   = null;
+var play     = true;
+
+//camera
 var camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 10000);
-camera.position.set(200, 400, 1200);
-camera.lookAt(new THREE.Vector3());
 
+//renderer
 var renderer = new THREE.WebGLRenderer();
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.gammaInput = true;
 renderer.gammaOutput = true;
 renderer.shadowMapEnabled = true;
 renderer.shadowMapCullFace = THREE.CullFaceBack;
+renderer.setClearColor( 0xaaaabb, 1 );
 
 document.body.appendChild(renderer.domElement);
 
-//Light
-dirLight = new THREE.DirectionalLight(0xffffff, 1);
-dirLight.color.setHSL(1, 1, 1);
-dirLight.position.set(0, 20, 0);
-dirLight.position.multiplyScalar(50);
-scene.add(dirLight);
-
-dirLight.castShadow = true;
-
-dirLight.shadowMapWidth = 2048;
-dirLight.shadowMapHeight = 2048;
-
-var d = 2500;
-
-dirLight.shadowCameraLeft = -d;
-dirLight.shadowCameraRight = d;
-dirLight.shadowCameraTop = d;
-dirLight.shadowCameraBottom = -d;
-
-// grids
-var size = 500, step = 50;
-zoom = 150;
-var grid = new THREE.Geometry();
-
-for (var i = -size; i <= size; i += step) {
-    grid.vertices.push(new THREE.Vector3(-size, -size, i));
-    grid.vertices.push(new THREE.Vector3(size, -size, i));
-
-    grid.vertices.push(new THREE.Vector3(i, -size, -size));
-    grid.vertices.push(new THREE.Vector3(i, -size, size));
-}
-
-for (var i = -size; i <= size; i += step) {
-    grid.vertices.push(new THREE.Vector3(-size, -size, i));
-    grid.vertices.push(new THREE.Vector3(-size, size, i));
-
-    grid.vertices.push(new THREE.Vector3(-size, i, -size));
-    grid.vertices.push(new THREE.Vector3(-size, i, size));
-}
-
-for (var i = -size; i <= size; i += step) {
-    grid.vertices.push(new THREE.Vector3(-size, i, -size));
-    grid.vertices.push(new THREE.Vector3(size, i, -size));
-
-    grid.vertices.push(new THREE.Vector3(i, -size, -size));
-    grid.vertices.push(new THREE.Vector3(i, size, -size));
-}
-
-scene.add(new THREE.Line(
-        grid,
-        new THREE.LineBasicMaterial({ color: 0xFFFFFF, opacity: 0.3, transparent: true }),
-        THREE.LinePieces
-));
-
-// GROUND
-var groundMat = new THREE.MeshPhongMaterial();
-groundMat.color.setHSL(0, 0, 0.5);
-
-var ground = new THREE.Mesh(new THREE.PlaneBufferGeometry(2500, 2500), groundMat);
-ground.rotation.x = -Math.PI / 2;
-ground.position.y = -size;
-scene.add(ground);
-
-ground.receiveShadow = true;
+$('canvas').on('click', function(){
+    if (!play && coordIdx == coords.length-1) {
+        coordIdx = 0;
+    }
+    play = !play;
+})
 
 //controls
 var controls = new THREE.TrackballControls(camera);
@@ -144,62 +98,135 @@ window.addEventListener('resize', function () {
     renderer.setSize(window.innerWidth, window.innerHeight);
 }, false);
 
+
+$.getJSON("/data/" + _GET['load'] + ".json", function(data) {init(data);});
+render();
+
+/* FUNCTIONS */
+function init(CONFIG) {
+    if (_HASH.length == 3) {
+        CONFIG.camera = _HASH;
+    }
+
+    camera.position.set(CONFIG.camera[0], CONFIG.camera[1], CONFIG.camera[2]);
+    camera.lookAt(new THREE.Vector3());
+
+    zoom = CONFIG.zoom;
+    var axis = new THREE.Vector3(
+                    CONFIG.axis[0] * CONFIG.scale * zoom,
+                    CONFIG.axis[1] * CONFIG.scale * zoom,
+                    CONFIG.axis[2] * CONFIG.scale * zoom);
+    var grid = new THREE.Geometry();
+
+//Light
+    dirLight = new THREE.DirectionalLight(0xffffff, 1);
+    dirLight.color.setHSL(1, 1, 1);
+    dirLight.position.set(0, 20, 0);
+    dirLight.position.multiplyScalar(50);
+    scene.add(dirLight);
+
+    dirLight.castShadow = true;
+
+    dirLight.shadowMapWidth = 2048;
+    dirLight.shadowMapHeight = 2048;
+
+    dirLight.shadowCameraLeft = -(axis.x / 2) + 100;
+    dirLight.shadowCameraRight = axis.y / 2 + 100;
+    dirLight.shadowCameraTop = axis.z / 2 + 100;
+    dirLight.shadowCameraBottom = -(axis.z / 2) + 100;
+
+// grids
+    if (CONFIG.grid.visible) {
+        for (var x = -(axis.x / 2); x <= (axis.x / 2); x += CONFIG.grid.step) {
+            grid.vertices.push(new THREE.Vector3(x, CONFIG.floor, -(axis.z / 2)));
+            grid.vertices.push(new THREE.Vector3(x, CONFIG.floor, axis.z / 2));
+
+            grid.vertices.push(new THREE.Vector3(x, CONFIG.floor, -(axis.z / 2)));
+            grid.vertices.push(new THREE.Vector3(x, CONFIG.floor + axis.y, -(axis.z / 2)));
+        }
+
+        for (var z = -(axis.z / 2); z <= (axis.z / 2); z += CONFIG.grid.step) {
+            grid.vertices.push(new THREE.Vector3(-(axis.x / 2), CONFIG.floor, z));
+            grid.vertices.push(new THREE.Vector3(axis.x / 2, CONFIG.floor, z));
+
+            grid.vertices.push(new THREE.Vector3(-(axis.x / 2), CONFIG.floor, z));
+            grid.vertices.push(new THREE.Vector3(-(axis.x / 2), CONFIG.floor + axis.y, z));
+        }
+
+        for (var y = 0; y <= axis.y; y += CONFIG.grid.step) {
+            grid.vertices.push(new THREE.Vector3(-(axis.x / 2), CONFIG.floor + y, -(axis.z / 2)));
+            grid.vertices.push(new THREE.Vector3(axis.x / 2, CONFIG.floor + y, -(axis.z / 2)));
+
+            grid.vertices.push(new THREE.Vector3(-(axis.x / 2), CONFIG.floor + y, -(axis.z / 2)));
+            grid.vertices.push(new THREE.Vector3(-(axis.x / 2), CONFIG.floor + y, axis.z / 2));
+        }
+
+        scene.add(new THREE.Line(
+                grid,
+                new THREE.LineBasicMaterial({ color: 0xFFFFFF, opacity: 0.3, transparent: true }),
+                THREE.LinePieces
+        ));
+    }
+
+// GROUND
+    var texture = THREE.ImageUtils.loadTexture(CONFIG.court);
+    var groundMat = new THREE.MeshPhongMaterial({map: texture});
+    groundMat.color.setHSL(0, 0, 0.5);
+
+    var ground = new THREE.Mesh(new THREE.PlaneBufferGeometry(axis.x, axis.z), groundMat);
+    ground.rotation.x = -Math.PI / 2;
+    ground.position.y = CONFIG.floor;
+    ground.receiveShadow = true;
+    scene.add(ground);
+
 //points
-for (var j = 0; j < 10; j++) {
-    var p = displayPoint(0, 0, 0);
-    points.push(p);
+    for (var j = 0; j < 10; j++) {
+        var p = displayPoint(0, 0, 0);
+        points.push(p);
+    }
+
+//load data
+    if (_GET['load'] != undefined) {
+        $.get("/data/" + _GET['load'] + ".data", function (data) {
+            var rows = data.split("\n");
+            var parsed = [];
+            var maxX = 0, maxY = 0, maxZ = 0;
+            for (var r in rows) {
+                if (rows[r]) {
+                    var p = $.parseJSON(rows[r]);
+                    maxX = Math.max(Math.abs(p[1]), maxX);
+                    maxY = Math.max(Math.abs(p[2]), maxY);
+                    maxZ = Math.max(Math.abs(p[3]), maxZ);
+                    parsed.push(p);
+                }
+            }
+
+            for (var d in parsed) {
+                addCoord(parsed[d]);
+            }
+            loaded = "file";
+
+            var s = $("#slider");
+            s.slider({
+                max: coords.length,
+                slide: function (event, ui) {
+                    coordIdx = ui.value;
+                    play = false;
+                }
+            });
+            s.on("mouseover", function () {
+                controls.enabled = false;
+            });
+            s.on("mouseout", function () {
+                controls.enabled = true;
+            });
+        });
+    } else if (_GET['live'] != undefined) {
+        getLiveData();
+    }
 }
 
-var coords = [];
-var paths = [];
-var loaded = null;
-var play = true;
-var timestamp = '';
-
-if (_GET['load'] != undefined) {
-    $.get("/data/" + _GET['load'] + ".data", function (data) {
-        var rows = data.split("\n");
-        var parsed = [];
-        var maxX = 0, maxY = 0, maxZ = 0;
-        for (var r in rows) {
-            if (rows[r]) {
-                var p = $.parseJSON(rows[r]);
-                maxX = Math.max(Math.abs(p[1]), maxX);
-                maxY = Math.max(Math.abs(p[2]), maxY);
-                maxZ = Math.max(Math.abs(p[3]), maxZ);
-                parsed.push(p);
-            }
-        }
-
-        zoom = size / Math.max(maxX, maxY, maxZ);
-        for (var d in parsed) {
-            addCoord(parsed[d]);
-        }
-        loaded = "file";
-
-        var s = $("#slider");
-        s.slider({
-            max: coords.length,
-            slide: function (event, ui) {
-                coordIdx = ui.value;
-                play = false;
-            }
-        });
-        s.on("mouseover", function () {
-            controls.enabled = false;
-        });
-        s.on("mouseout", function () {
-            controls.enabled = true;
-        });
-    });
-} else if (_GET['live'] != undefined) {
-    getLiveData();
-}
-
-var reuseIdx = 0;
-var coordIdx = 0;
-
-var render = function () {
+function render() {
     requestAnimationFrame(render);
 
     if (loaded != null) {
@@ -237,9 +264,9 @@ var render = function () {
 
     controls.update();
     renderer.render(scene, camera);
-};
+    location.hash = camera.position.x+","+camera.position.y+","+camera.position.z;
+}
 
-render();
 
 function displayPoint(x, y, z) {
     var point = new THREE.Mesh(
@@ -266,7 +293,7 @@ function getLiveData() {
 
 function addCoord(data) {
     var c = coords.length;
-    coords[c] = new THREE.Vector3(data[1] * zoom, data[2] * zoom, data[3] * zoom);
+    coords[c] = new THREE.Vector3(data[1] * zoom, data[3] * zoom, data[2] * zoom);
     var path = new THREE.Geometry();
     path.vertices.push(c > 0 ? coords[c - 1] : coords[0]);
     path.vertices.push(coords[c]);
