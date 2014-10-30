@@ -46,15 +46,15 @@ var scene = new THREE.Scene();
 
 var points = [];
 var coords = [];
-var paths  = [];
+var paths = [];
 
-var reuseIdx  = 0;
-var coordIdx  = 0;
+var reuseIdx = 0;
+var coordIdx = 0;
 var timestamp = 0;
-var zoom      = 150;
+var zoom = 150;
 
-var loaded   = null;
-var play     = true;
+var loaded = null;
+var play = true;
 
 //camera
 var camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 10000);
@@ -66,12 +66,12 @@ renderer.gammaInput = true;
 renderer.gammaOutput = true;
 renderer.shadowMapEnabled = true;
 renderer.shadowMapCullFace = THREE.CullFaceBack;
-renderer.setClearColor( 0xaaaabb, 1 );
+renderer.setClearColor(0xaaaabb, 1);
 
 document.body.appendChild(renderer.domElement);
 
-$('canvas').on('click', function(){
-    if (!play && coordIdx == coords.length-1) {
+$('canvas').on('click', function () {
+    if (!play && coordIdx == coords.length - 1) {
         coordIdx = 0;
     }
     play = !play;
@@ -99,7 +99,9 @@ window.addEventListener('resize', function () {
 }, false);
 
 
-$.getJSON("/data/" + _GET['load'] + ".json", function(data) {init(data);});
+$.getJSON("/data/" + _GET['load'] + ".json", function (data) {
+    init(data);
+});
 render();
 
 /* FUNCTIONS */
@@ -239,7 +241,7 @@ function render() {
             points[reuseIdx].position.copy(coords[coordIdx]);
             points[reuseIdx].scale.set(1, 1, 1);
             for (var p = 0; p < coords.length; p++) {
-                paths[p].visible = p < coordIdx;
+                paths[p].visible = p < coordIdx + 1;
             }
 
             if (play) {
@@ -264,7 +266,7 @@ function render() {
 
     controls.update();
     renderer.render(scene, camera);
-    location.hash = camera.position.x+","+camera.position.y+","+camera.position.z;
+    location.hash = camera.position.x + "," + camera.position.y + "," + camera.position.z;
 }
 
 
