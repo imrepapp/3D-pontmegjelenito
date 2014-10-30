@@ -52,6 +52,7 @@ var reuseIdx = 0;
 var coordIdx = 0;
 var timestamp = 0;
 var zoom = 150;
+var tailCount = 10;
 
 var loaded = null;
 var play = true;
@@ -184,7 +185,7 @@ function init(CONFIG) {
     scene.add(ground);
 
 //points
-    for (var j = 0; j < 10; j++) {
+    for (var j = 0; j < tailCount; j++) {
         var p = displayPoint(0, 0, 0);
         points.push(p);
     }
@@ -287,8 +288,11 @@ function getLiveData() {
     $.get("/live.php?file=" + _GET['live'] + "&ts=" + timestamp, function (data) {
         if (data) {
             var p = $.parseJSON(data);
-            timestamp = p[0];
-            addCoord(p);
+            for (var pIndex in p) {
+                timestamp = p[pIndex][0];
+                addCoord(p[pIndex]);
+            }
+            coordIdx = Math.max(coords.length - tailCount, coordIdx);
             play = true;
         }
         loaded = "live";

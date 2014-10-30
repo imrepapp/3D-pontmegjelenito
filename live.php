@@ -10,9 +10,13 @@ if (array_key_exists('file', $_GET) && file_exists(sprintf('data/%s.data', $_GET
   if (array_key_exists('ts', $_GET) && !empty($_GET['ts'])) {
     $i = array_search($_GET['ts'], array_keys($timestamps));
     if ($i !== false && count($timestamps) > $i + 1) {
-      echo $data[array_values($timestamps)[$i + 1]];
+      $ret = array();
+      for ($j = $i+1; $j < count($timestamps); $j++) {
+        $ret[] = json_decode($data[array_values($timestamps)[$j]]);
+      }
+      echo json_encode($ret);
     }
   } else {
-    echo $data[array_values($timestamps)[0]];
+    printf('[%s]', $data[array_values($timestamps)[0]]);
   }
 }
