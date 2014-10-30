@@ -289,9 +289,9 @@ function getLiveData() {
         if (data) {
             var p = $.parseJSON(data);
             for (var pIndex in p) {
-                timestamp = p[pIndex][0];
                 addCoord(p[pIndex]);
             }
+            timestamp = p[coords.length][0];
             coordIdx = Math.max(coords.length - tailCount, coordIdx);
             play = true;
         }
