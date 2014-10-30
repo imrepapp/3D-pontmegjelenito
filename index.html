@@ -1,0 +1,282 @@
+<html>
+<head>
+    <title>Point loader</title>
+    <style>
+        body {
+            margin: 0;
+        }
+
+        canvas {
+            width: 100%;
+            height: 100%
+        }
+
+        #slider {
+            position: absolute;
+            width: 90%;
+            left: 5%;
+            bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+<script src="js/three.min.js"></script>
+<script src="js/TrackballControls.js"></script>
+<link rel="stylesheet" href="//code.jquery.com/ui/1.11.2/themes/smoothness/jquery-ui.css">
+<script src="//code.jquery.com/jquery-2.1.1.min.js"></script>
+<script src="//code.jquery.com/ui/1.11.1/jquery-ui.min.js"></script>
+<script>
+var _GET = (function () {
+    var vars = [], hash;
+    var q = document.URL.split('?')[1];
+    if (q != undefined) {
+        q = q.split('&');
+        for (var i = 0; i < q.length; i++) {
+            hash = q[i].split('=');
+            vars[hash[0]] = hash[1];
+        }
+    }
+    return vars;
+})();
+
+var pathMaterial = new THREE.LineBasicMaterial({ color: 0xFF0000, opacity: 0.3, transparent: true });
+
+var scene = new THREE.Scene();
+
+var points = [];
+
+var camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 10000);
+camera.position.set(200, 400, 1200);
+camera.lookAt(new THREE.Vector3());
+
+var renderer = new THREE.WebGLRenderer();
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.gammaInput = true;
+renderer.gammaOutput = true;
+renderer.shadowMapEnabled = true;
+renderer.shadowMapCullFace = THREE.CullFaceBack;
+
+document.body.appendChild(renderer.domElement);
+
+//Light
+dirLight = new THREE.DirectionalLight(0xffffff, 1);
+dirLight.color.setHSL(1, 1, 1);
+dirLight.position.set(0, 20, 0);
+dirLight.position.multiplyScalar(50);
+scene.add(dirLight);
+
+dirLight.castShadow = true;
+
+dirLight.shadowMapWidth = 2048;
+dirLight.shadowMapHeight = 2048;
+
+var d = 2500;
+
+dirLight.shadowCameraLeft = -d;
+dirLight.shadowCameraRight = d;
+dirLight.shadowCameraTop = d;
+dirLight.shadowCameraBottom = -d;
+
+// grids
+var size = 500, step = 50;
+zoom = 150;
+var grid = new THREE.Geometry();
+
+for (var i = -size; i <= size; i += step) {
+    grid.vertices.push(new THREE.Vector3(-size, -size, i));
+    grid.vertices.push(new THREE.Vector3(size, -size, i));
+
+    grid.vertices.push(new THREE.Vector3(i, -size, -size));
+    grid.vertices.push(new THREE.Vector3(i, -size, size));
+}
+
+for (var i = -size; i <= size; i += step) {
+    grid.vertices.push(new THREE.Vector3(-size, -size, i));
+    grid.vertices.push(new THREE.Vector3(-size, size, i));
+
+    grid.vertices.push(new THREE.Vector3(-size, i, -size));
+    grid.vertices.push(new THREE.Vector3(-size, i, size));
+}
+
+for (var i = -size; i <= size; i += step) {
+    grid.vertices.push(new THREE.Vector3(-size, i, -size));
+    grid.vertices.push(new THREE.Vector3(size, i, -size));
+
+    grid.vertices.push(new THREE.Vector3(i, -size, -size));
+    grid.vertices.push(new THREE.Vector3(i, size, -size));
+}
+
+scene.add(new THREE.Line(
+        grid,
+        new THREE.LineBasicMaterial({ color: 0xFFFFFF, opacity: 0.3, transparent: true }),
+        THREE.LinePieces
+));
+
+// GROUND
+var groundMat = new THREE.MeshPhongMaterial();
+groundMat.color.setHSL(0, 0, 0.5);
+
+var ground = new THREE.Mesh(new THREE.PlaneBufferGeometry(2500, 2500), groundMat);
+ground.rotation.x = -Math.PI / 2;
+ground.position.y = -size;
+scene.add(ground);
+
+ground.receiveShadow = true;
+
+//controls
+var controls = new THREE.TrackballControls(camera);
+
+controls.rotateSpeed = 1.0;
+controls.zoomSpeed = 1.2;
+controls.panSpeed = 0.8;
+
+controls.noZoom = false;
+controls.noPan = false;
+
+controls.staticMoving = true;
+controls.dynamicDampingFactor = 0.15;
+
+//resize event listener
+window.addEventListener('resize', function () {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+
+    renderer.setSize(window.innerWidth, window.innerHeight);
+}, false);
+
+//points
+for (var j = 0; j < 10; j++) {
+    var p = displayPoint(0, 0, 0);
+    points.push(p);
+}
+
+var coords = [];
+var paths = [];
+var loaded = null;
+var play = true;
+var timestamp = '';
+
+if (_GET['load'] != undefined) {
+    $.get("/data/" + _GET['load'] + ".data", function (data) {
+        var rows = data.split("\n");
+        var parsed = [];
+        var maxX = 0, maxY = 0, maxZ = 0;
+        for (var r in rows) {
+            if (rows[r]) {
+                var p = $.parseJSON(rows[r]);
+                maxX = Math.max(Math.abs(p[1]), maxX);
+                maxY = Math.max(Math.abs(p[2]), maxY);
+                maxZ = Math.max(Math.abs(p[3]), maxZ);
+                parsed.push(p);
+            }
+        }
+
+        zoom = size / Math.max(maxX, maxY, maxZ);
+        for (var d in parsed) {
+            addCoord(parsed[d]);
+        }
+        loaded = "file";
+
+        var s = $("#slider");
+        s.slider({
+            max: coords.length,
+            slide: function (event, ui) {
+                coordIdx = ui.value;
+                play = false;
+            }
+        });
+        s.on("mouseover", function () {
+            controls.enabled = false;
+        });
+        s.on("mouseout", function () {
+            controls.enabled = true;
+        });
+    });
+} else if (_GET['live'] != undefined) {
+    getLiveData();
+}
+
+var reuseIdx = 0;
+var coordIdx = 0;
+
+var render = function () {
+    requestAnimationFrame(render);
+
+    if (loaded != null) {
+        if (loaded == "live") {
+            loaded = null;
+            getLiveData();
+        }
+
+        if (coordIdx < coords.length - 1 && coordIdx > -1) {
+            points[reuseIdx].position.copy(coords[coordIdx]);
+            points[reuseIdx].scale.set(1, 1, 1);
+            for (var p = 0; p < coords.length; p++) {
+                paths[p].visible = p < coordIdx;
+            }
+
+            if (play) {
+                coordIdx++;
+                if (loaded == 'file') {
+                    $("#slider").slider("value", coordIdx);
+                }
+            }
+        } else {
+            play = false;
+        }
+
+        //tail effect
+        for (var i = 0; i < points.length - 1; i++) {
+            var p = points[i];
+            p.scale.multiplyScalar(0.9);
+            p.scale.clampScalar(0.0001, 1);
+        }
+
+        reuseIdx = (reuseIdx + 1) % points.length;
+    }
+
+    controls.update();
+    renderer.render(scene, camera);
+};
+
+render();
+
+function displayPoint(x, y, z) {
+    var point = new THREE.Mesh(
+            new THREE.SphereGeometry(9, 10, 10),
+            new THREE.MeshLambertMaterial({ color: 0x00FF00, opacity: 1, transparent: false })
+    );
+    point.castShadow = true;
+    scene.add(point);
+    point.position.set(x, y, z);
+    return point;
+}
+
+function getLiveData() {
+    $.get("/live.php?file=" + _GET['live'] + "&ts=" + timestamp, function (data) {
+        if (data) {
+            var p = $.parseJSON(data);
+            timestamp = p[0];
+            addCoord(p);
+            play = true;
+        }
+        loaded = "live";
+    });
+}
+
+function addCoord(data) {
+    var c = coords.length;
+    coords[c] = new THREE.Vector3(data[1] * zoom, data[2] * zoom, data[3] * zoom);
+    var path = new THREE.Geometry();
+    path.vertices.push(c > 0 ? coords[c - 1] : coords[0]);
+    path.vertices.push(coords[c]);
+    paths[c] = new THREE.Line(path, pathMaterial, THREE.LinePieces);
+    paths[c].visible = false;
+    scene.add(paths[c]);
+}
+</script>
+
+<div id="slider"></div>
+
+</body>
+</html>

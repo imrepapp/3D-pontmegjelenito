@@ -1,0 +1,23 @@
+# vim temp files
+*.swp
+
+# ant config files
+build.xml
+ant.properties
+local.properties
+project.properties
+
+# intelij config files
+*.iml
+.idea/
+
+# osx craps
+.DS_Store
+
+apache/
+
+# generated files
+bin/
+gen/
+obj/
+out/
