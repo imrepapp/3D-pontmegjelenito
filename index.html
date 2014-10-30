@@ -50,7 +50,7 @@ var paths = [];
 
 var reuseIdx = 0;
 var coordIdx = 0;
-var timestamp = 0;
+var count = 0;
 var zoom = 150;
 var tailCount = 10;
 
@@ -285,14 +285,14 @@ function displayPoint(x, y, z) {
 }
 
 function getLiveData() {
-    $.get("/live.php?file=" + _GET['live'] + "&ts=" + timestamp, function (data) {
+    $.get("/live.php?file=" + _GET['live'] + "&row=" + count, function (data) {
         if (data) {
             var p = $.parseJSON(data);
             for (var pIndex in p) {
                 addCoord(p[pIndex]);
             }
-            timestamp = p[p.length - 1][0];
-            coordIdx = Math.max(coords.length - tailCount, coordIdx);
+            count = coords.length;
+            coordIdx = Math.max(count - tailCount, coordIdx);
             play = true;
         }
         loaded = "live";

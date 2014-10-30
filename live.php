@@ -1,6 +1,17 @@
 <?php
 if (array_key_exists('file', $_GET) && file_exists(sprintf('data/%s.data', $_GET['file']))) {
   $data = file(sprintf('data/%s.data', $_GET['file']));
+  $row = 0;
+  if (array_key_exists('row', $_GET) && !empty($_GET['row'])) {
+    $row = $_GET['row'];
+  }
+  printf('[%s]', join(',', array_slice($data, $row)));
+}
+
+
+/* timestamp
+if (array_key_exists('file', $_GET) && file_exists(sprintf('data/%s.data', $_GET['file']))) {
+  $data = file(sprintf('data/%s.data', $_GET['file']));
   $timestamps = array();
   foreach ($data as $key => $row) {
     $p = json_decode($row, true);
